@@ -1,0 +1,11 @@
+{
+  "name": "my-todo-backend",
+  "version": "1.0.0",
+  "description": "A simple server for a to-do list.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "ISC"
+}
