@@ -5,7 +5,7 @@ const hostname = '0.0.0.0';
 const port = process.env.PORT || 3000;
 
 // Paste your connection string here. Make sure you've replaced <password>
-const uri = "mongodb+srv://todoappuser:<25#Percivaltag>@todoappuser.qoh6t5e.mongodb.net/?retryWrites=true&w=majority&appName=todoappuser";
+const uri = "mongodb+srv://todoappuser:<percivaltag>@todoappuser.qoh6t5e.mongodb.net/?retryWrites=true&w=majority&appName=todoappuser";
 const client = new MongoClient(uri);
 
 let db;
