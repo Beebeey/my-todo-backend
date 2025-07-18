@@ -1,52 +1,82 @@
 const http = require('http');
+const { MongoClient } = require('mongodb');
 
-// Use the host and port provided by Render
 const hostname = '0.0.0.0';
 const port = process.env.PORT || 3000;
 
-let tasks = [
-  { text: "Learn Node.js", completed: true },
-  { text: "Build a server", completed: true },
-  { text: "Deploy the back end", completed: true }
-];
+// Paste your connection string here. Make sure you've replaced <password>
+const uri = "mongodb+srv://todoappuser:<25#Percivaltag>@todoappuser.qoh6t5e.mongodb.net/?retryWrites=true&w=majority&appName=todoappuser";
+const client = new MongoClient(uri);
 
-const server = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+let db;
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
+async function connectToDatabase() {
+    try {
+        await client.connect();
+        db = client.db('todo-app'); // You can name your database here
+        console.log("Successfully connected to MongoDB.");
 
-  if (req.url === '/tasks' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(tasks));
-  } else if (req.url === '/tasks' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk.toString(); });
-    req.on('end', () => {
-      const newTask = JSON.parse(body);
-      tasks.push(newTask);
-      res.writeHead(201, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(newTask));
-    });
-  } else if (req.url === '/save' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk.toString(); });
-    req.on('end', () => {
-      tasks = JSON.parse(body);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ message: 'Tasks saved successfully' }));
-    });
-  } else {
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ message: 'Error: Not Found' }));
-  }
+        // Check if the tasks collection is empty, if so add default tasks
+        const taskCount = await db.collection('tasks').countDocuments();
+        if (taskCount === 0) {
+            await db.collection('tasks').insertMany([
+                { text: "Learn MongoDB", completed: true },
+                { text: "Connect server to database", completed: false }
+            ]);
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+const server = http.createServer(async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
+    const tasksCollection = db.collection('tasks');
+
+    if (req.url === '/tasks' && req.method === 'GET') {
+        const tasks = await tasksCollection.find({}).toArray();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(tasks));
+    } else if (req.url === '/tasks' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', async () => {
+            const newTask = JSON.parse(body);
+            await tasksCollection.insertOne(newTask);
+            res.writeHead(201, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(newTask));
+        });
+    } else if (req.url === '/save' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', async () => {
+            const updatedTasks = JSON.parse(body);
+            // Delete all existing tasks and insert the new list
+            await tasksCollection.deleteMany({});
+            if (updatedTasks.length > 0) {
+                await tasksCollection.insertMany(updatedTasks);
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: 'Tasks saved successfully' }));
+        });
+    } else {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ message: 'Error: Not Found' }));
+    }
 });
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`);
+// Connect to the database before starting the server
+connectToDatabase().then(() => {
+    server.listen(port, hostname, () => {
+        console.log(`Server running at http://${hostname}:${port}/ and connected to the database.`);
+    });
 });
