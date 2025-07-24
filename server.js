@@ -42,7 +42,34 @@ app.post('/register', async (req, res) => {
   }
 });
 
+// Login a user
+app.post('/login', async (req, res) => {
+  try {
+    // Find the user by email
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
+    // Compare the provided password with the stored hash
+    const isMatch = await bcrypt.compare(req.body.password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // Create a JSON Web Token
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET, // We will add this secret key on Render
+      { expiresIn: '1h' } // Token expires in 1 hour
+    );
+
+    res.json({ token, userId: user._id });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Error logging in', error });
+  }
+});
 // --- TODO ROUTES (We will secure these later) ---
 
 app.get('/tasks', (req, res) => {
