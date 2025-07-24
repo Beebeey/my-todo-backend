@@ -1,58 +1,57 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ObjectId } = require('mongodb');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+// Import the User model
+const User = require('./models/User');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const uri = process.env.DATABASE_URL;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-const client = new MongoClient(uri);
-let tasksCollection;
+// Connect to MongoDB using Mongoose
+mongoose.connect(uri)
+  .then(() => console.log("Successfully connected to MongoDB via Mongoose."))
+  .catch(err => console.error("Connection error", err));
 
-async function connectToDatabase() {
-    try {
-        await client.connect();
-        const db = client.db('todo-app');
-        tasksCollection = db.collection('tasks');
-        console.log("Successfully connected to MongoDB via Express.");
-    } catch (e) {
-        console.error(e);
-    }
-}
+// --- AUTHENTICATION ROUTES ---
 
-// GET all tasks
-app.get('/tasks', async (req, res) => {
-    const tasks = await tasksCollection.find({}).toArray();
-    res.json(tasks);
-});
+// Register a new user
+app.post('/register', async (req, res) => {
+  try {
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
-// POST a new task
-app.post('/tasks', async (req, res) => {
-    const newTask = req.body;
-    const result = await tasksCollection.insertOne(newTask);
-    res.status(201).json(result);
-});
-
-// DELETE a task
-app.delete('/tasks/:id', async (req, res) => {
-    const result = await tasksCollection.deleteOne({ _id: new ObjectId(req.params.id) });
-    res.json(result);
-});
-
-// PUT (update) a task
-app.put('/tasks/:id', async (req, res) => {
-    const result = await tasksCollection.updateOne(
-        { _id: new ObjectId(req.params.id) },
-        { $set: { completed: req.body.completed } }
-    );
-    res.json(result);
-});
-
-connectToDatabase().then(() => {
-    app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
+    // Create a new user with the hashed password
+    const newUser = new User({
+      email: req.body.email,
+      password: hashedPassword
     });
+
+    const savedUser = await newUser.save();
+    res.status(201).json(savedUser);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Error registering new user', error });
+  }
+});
+
+
+// --- TODO ROUTES (We will secure these later) ---
+
+app.get('/tasks', (req, res) => {
+  // Placeholder - to be implemented
+  res.json([]);
+});
+
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
